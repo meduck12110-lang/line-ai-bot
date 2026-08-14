@@ -2,6 +2,7 @@ import os
 
 from flask import Flask, request
 from dotenv import load_dotenv
+
 from google import genai
 from google.genai import types
 
@@ -16,9 +17,9 @@ from linebot.v3.messaging import (
     TextMessage,
 )
 
-# =========================
-# Load environment variables
-# =========================
+# =====================================================
+# LOAD ENVIRONMENT VARIABLES
+# =====================================================
 
 load_dotenv()
 
@@ -36,16 +37,16 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is missing")
 
 
-# =========================
-# Flask
-# =========================
+# =====================================================
+# FLASK
+# =====================================================
 
 app = Flask(__name__)
 
 
-# =========================
-# LINE
-# =========================
+# =====================================================
+# LINE SETUP
+# =====================================================
 
 configuration = Configuration(
     access_token=LINE_CHANNEL_ACCESS_TOKEN
@@ -57,74 +58,94 @@ handler = WebhookHandler(
 
 
 # =====================================================
-# GEMINI
+# GEMINI SETUP
 # =====================================================
 
 gemini = genai.Client(
     api_key=GEMINI_API_KEY
 )
 
+# ใช้ชื่อเดียวกับที่ test_gemini.py ของคุณใช้ได้
 GEMINI_MODEL = "gemini-3.6-flash"
 
 
 # =====================================================
-# AI PERSONALITY / SYSTEM PROMPT
+# MRT AI PERSONALITY / SYSTEM PROMPT
 # =====================================================
 
 SYSTEM_PROMPT = """
-คุณคือ "MRT Local Guide" ผู้ช่วยแนะนำการท่องเที่ยวรอบสถานี MRT
-ของการรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย (รฟม.)
+คุณคือ "MRT Local Guide"
+ผู้ช่วยแนะนำการท่องเที่ยวรอบสถานี MRT ของ รฟม.
 
-หน้าที่ของคุณคือช่วยผู้ใช้ค้นหาและวางแผนเที่ยว
-โดยเน้นสถานี MRT ชุมชน ร้านอาหาร สถานที่สำคัญ วัฒนธรรม
-ตลาด คาเฟ่ สถานที่ถ่ายรูป และแหล่งท่องเที่ยวที่อยู่ใกล้สถานี MRT
+หน้าที่หลัก:
+ช่วยผู้ใช้ค้นหาและวางแผนการท่องเที่ยว
+โดยเน้นสถานี MRT ชุมชน ร้านอาหาร ตลาด คาเฟ่
+วัฒนธรรม สถานที่สำคัญ และสถานที่ท่องเที่ยวใกล้สถานี MRT
 
-แนวทางการตอบ:
-- ตอบเป็นภาษาไทยที่เป็นธรรมชาติและเป็นมิตร
-- แนะนำสถานที่ที่เดินทางได้สะดวกจากสถานี MRT
-- บอกชื่อสถานี MRT ที่ใกล้ที่สุด
-- อธิบายวิธีเดินทางจากสถานีแบบเข้าใจง่าย
-- เน้นชุมชนและสถานที่ท้องถิ่น
-- ถ้าผู้ใช้บอกความสนใจ เช่น อาหาร ประวัติศาสตร์ คาเฟ่
-  วัฒนธรรม หรือถ่ายรูป ให้ปรับคำแนะนำตามความสนใจ
-- ถ้าเหมาะสม ให้แนะนำ 2-4 สถานที่
-- สามารถจัดทริป 2-3 ชั่วโมง หรือครึ่งวันได้
-- ถ้าข้อมูลเกี่ยวกับเวลาเปิด-ปิด ค่าเข้าชม หรือกิจกรรมอาจเปลี่ยนแปลง
-  ให้บอกผู้ใช้ว่าควรตรวจสอบข้อมูลล่าสุดก่อนเดินทาง
-- ห้ามสร้างข้อมูลที่ไม่แน่ใจขึ้นมาเอง
-- ถ้าไม่ทราบข้อมูล ให้บอกตรง ๆ
-- ตอบให้อ่านง่ายและไม่ยาวเกินความจำเป็น
+กฎการตอบ:
+
+1. ตอบเป็นภาษาไทย
+2. ใช้น้ำเสียงเป็นมิตร เหมือนผู้ช่วยแนะนำเที่ยว
+3. ตอบให้กระชับ อ่านง่าย และเข้าใจง่าย
+4. หากผู้ใช้ถามถึงสถานที่ ให้บอกสถานี MRT ที่ใกล้ที่สุด
+5. อธิบายวิธีเดินทางจากสถานีไปยังสถานที่
+6. เน้นชุมชนและสถานที่ท้องถิ่น
+7. ถ้าเหมาะสม ให้แนะนำ 2-4 สถานที่
+8. หากผู้ใช้ต้องการเที่ยวหลายจุด ให้จัดเป็นเส้นทาง
+9. สามารถจัดทริป 2-3 ชั่วโมง หรือครึ่งวันได้
+10. หากข้อมูลเกี่ยวกับเวลาเปิด-ปิด ค่าเข้าชม
+    หรือกิจกรรมอาจเปลี่ยนแปลง ให้แจ้งว่าควรตรวจสอบข้อมูลล่าสุด
+11. ห้ามสร้างข้อมูลที่ไม่แน่ใจขึ้นมาเอง
+12. หากไม่ทราบข้อมูล ให้บอกตรง ๆ
+13. หากคำถามไม่เกี่ยวกับการท่องเที่ยว MRT
+    ให้ตอบสั้น ๆ และชวนผู้ใช้กลับมาคุยเรื่องการท่องเที่ยว MRT
+
+เมื่อแนะนำสถานที่ สามารถใช้รูปแบบนี้:
+
+📍 สถานที่:
+🚇 MRT ใกล้ที่สุด:
+🚶 วิธีเดินทาง:
+⭐ ไฮไลต์:
+💡 เคล็ดลับ:
 
 เป้าหมาย:
 ทำให้ผู้ใช้รู้สึกว่า
-"MRT ไม่ได้เป็นแค่ทางผ่าน แต่เป็นประตูสู่ชุมชน
-และสถานที่น่าสนใจรอบเมือง"
+
+"MRT ไม่ได้เป็นแค่ทางผ่าน
+แต่เป็นประตูสู่ชุมชนและสถานที่น่าสนใจรอบเมือง"
 """
 
 
-# =========================
-# Send reply to LINE
-# =========================
+# =====================================================
+# SEND REPLY TO LINE
+# =====================================================
 
 def send_reply(reply_token, text):
 
-    with ApiClient(configuration) as api_client:
+    try:
 
-        messaging_api = MessagingApi(api_client)
+        with ApiClient(configuration) as api_client:
 
-        messaging_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[
-                    TextMessage(text=text)
-                ]
+            messaging_api = MessagingApi(api_client)
+
+            messaging_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[
+                        TextMessage(text=text)
+                    ]
+                )
             )
-        )
+
+    except Exception as error:
+
+        print("LINE REPLY ERROR:")
+        print(repr(error))
 
 
-# =========================
-# LINE Webhook
-# =========================
+# =====================================================
+# WEBHOOK
+# =====================================================
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -136,27 +157,36 @@ def callback():
 
     body = request.get_data(as_text=True)
 
-    print("========== LINE EVENT ==========")
+    print("\n========== LINE EVENT ==========")
     print(body)
-    print("================================")
+    print("================================\n")
 
     try:
-        handler.handle(body, signature)
+
+        handler.handle(
+            body,
+            signature
+        )
 
     except InvalidSignatureError:
-        print("Invalid LINE signature")
+
+        print("INVALID SIGNATURE")
+
         return "Invalid signature", 400
 
     except Exception as error:
-        print("Webhook error:", repr(error))
+
+        print("WEBHOOK ERROR:")
+        print(repr(error))
+
         return "Internal Server Error", 500
 
     return "OK", 200
 
 
-# =========================
-# Receive text messages
-# =========================
+# =====================================================
+# RECEIVE MESSAGE FROM LINE
+# =====================================================
 
 @handler.add(
     MessageEvent,
@@ -166,105 +196,91 @@ def handle_message(event):
 
     user_message = event.message.text.strip()
 
-    print("USER MESSAGE:", user_message)
+    print("USER MESSAGE:")
+    print(user_message)
 
-    # -------------------------
-    # Rich Menu: Chat
-    # -------------------------
+    # =================================================
+    # RICH MENU COMMANDS
+    # =================================================
 
     if user_message == "/chat":
 
-        reply = (
-            "🤖 Chat\n\n"
-            "พร้อมคุยแล้วครับ!\n"
-            "พิมพ์คำถามมาได้เลย"
+        send_reply(
+            event.reply_token,
+            "🤖 พร้อมคุยแล้วครับ!\nพิมพ์คำถามมาได้เลย"
         )
-
-        send_reply(event.reply_token, reply)
         return
-
-    # -------------------------
-    # Rich Menu: Help
-    # -------------------------
 
     if user_message == "/help":
 
-        reply = (
-            "📚 Help\n\n"
-            "พิมพ์คำถามเพื่อคุยกับ AI ได้เลย\n"
-            "หรือใช้ Rich Menu ด้านล่าง"
+        send_reply(
+            event.reply_token,
+            "📚 Help\n\nพิมพ์คำถามเพื่อคุยกับ AI ได้เลย"
         )
-
-        send_reply(event.reply_token, reply)
         return
-
-    # -------------------------
-    # Rich Menu: About
-    # -------------------------
 
     if user_message == "/about":
 
-        reply = (
+        send_reply(
+            event.reply_token,
             "ℹ️ About\n\n"
-            "LINE AI Chatbot\n\n"
+            "MRT Local Guide\n"
             "สร้างด้วย Python + LINE Messaging API + Gemini"
         )
-
-        send_reply(event.reply_token, reply)
         return
-
-    # -------------------------
-    # Rich Menu: Reset
-    # -------------------------
 
     if user_message == "/reset":
 
-        reply = (
-            "🔄 Reset\n\n"
-            "เริ่มการสนทนาใหม่แล้วครับ"
+        send_reply(
+            event.reply_token,
+            "🔄 เริ่มต้นการสนทนาใหม่แล้วครับ"
         )
-
-        send_reply(event.reply_token, reply)
         return
-
-    # -------------------------
-    # Rich Menu: Contact
-    # -------------------------
 
     if user_message == "/contact":
 
-        reply = (
-            "📞 Contact\n\n"
-            "ติดต่อผู้ดูแล Bot ได้ที่นี่"
+        send_reply(
+            event.reply_token,
+            "📞 ติดต่อผู้ดูแล Bot ได้ที่นี่"
         )
-
-        send_reply(event.reply_token, reply)
         return
 
-    # =========================
-    # Normal Gemini Chat
-    # =========================
+
+    # =================================================
+    # GEMINI AI
+    # =================================================
 
     try:
 
         response = gemini.models.generate_content(
             model=GEMINI_MODEL,
-            contents=user_message
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT
+            )
         )
 
         ai_reply = response.text
 
         if not ai_reply:
-            ai_reply = "ขอโทษครับ ตอนนี้ยังตอบไม่ได้"
+
+            ai_reply = (
+                "ขอโทษครับ ตอนนี้ผมยังสร้างคำตอบไม่ได้"
+            )
 
     except Exception as error:
 
-        print("Gemini error:", repr(error))
+        print("GEMINI ERROR:")
+        print(repr(error))
 
         ai_reply = (
             "ขอโทษครับ 😭\n"
-            "ตอนนี้ AI มีปัญหาชั่วคราว ลองใหม่อีกครั้งครับ"
+            "ตอนนี้ AI มีปัญหาชั่วคราว ลองใหม่อีกครั้งนะครับ"
         )
+
+    # =================================================
+    # SEND AI RESPONSE
+    # =================================================
 
     send_reply(
         event.reply_token,
@@ -272,15 +288,19 @@ def handle_message(event):
     )
 
 
-# =========================
-# Home page
-# =========================
+# =====================================================
+# HOME PAGE
+# =====================================================
 
 @app.route("/", methods=["GET"])
 def home():
 
-    return "LINE AI Bot is running!", 200
+    return "MRT Local Guide Bot is running!", 200
 
+
+# =====================================================
+# START SERVER
+# =====================================================
 
 if __name__ == "__main__":
 
