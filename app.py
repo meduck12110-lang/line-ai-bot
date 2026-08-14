@@ -207,7 +207,7 @@ def handle_message(event):
 
         send_reply(
             event.reply_token,
-            "🤖 พร้อมคุยแล้วครับ!\nพิมพ์คำถามมาได้เลย"
+            "🤖 พร้อมให้บริการแล้ว! สอบถามเส้นทาง MRT หรือค้นหาสถานที่น่าสนใจได้เลย"
         )
         return
 
@@ -225,7 +225,7 @@ def handle_message(event):
             event.reply_token,
             "ℹ️ About\n\n"
             "MRT Local Guide\n"
-            "สร้างด้วย Python + LINE Messaging API + Gemini"
+            "สวัสดี! เราคือ MRT Travel Assistant ไม่ว่าจะกำลังหาสถานี วางเส้นทาง หรืออยากรู้ว่ารอบสถานีมีอะไรน่าเที่ยว เราช่วยแนะนำให้ได้!บอกจุดหมายมา แล้วออกเดินทางไปด้วยกันเลย ✨"
         )
         return
 
@@ -241,7 +241,7 @@ def handle_message(event):
 
         send_reply(
             event.reply_token,
-            "📞 ติดต่อผู้ดูแล Bot ได้ที่นี่"
+            "📞 ติดต่อผู้ดูแล Bot ได้ที่นี่ 081-xxx-xxx"
         )
         return
 
