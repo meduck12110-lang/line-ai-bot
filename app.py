@@ -2,16 +2,11 @@ import os
 
 from flask import Flask, request
 from dotenv import load_dotenv
-
 from google import genai
 
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import (
-    MessageEvent,
-    TextMessageContent,
-    PostbackEvent,
-)
+from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
@@ -20,9 +15,9 @@ from linebot.v3.messaging import (
     TextMessage,
 )
 
-# =========================================================
-# ENVIRONMENT
-# =========================================================
+# =========================
+# Load environment variables
+# =========================
 
 load_dotenv()
 
@@ -40,16 +35,16 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is missing")
 
 
-# =========================================================
-# FLASK
-# =========================================================
+# =========================
+# Flask
+# =========================
 
 app = Flask(__name__)
 
 
-# =========================================================
+# =========================
 # LINE
-# =========================================================
+# =========================
 
 configuration = Configuration(
     access_token=LINE_CHANNEL_ACCESS_TOKEN
@@ -60,22 +55,22 @@ handler = WebhookHandler(
 )
 
 
-# =========================================================
-# GEMINI
-# =========================================================
+# =========================
+# Gemini
+# =========================
 
 gemini = genai.Client(
     api_key=GEMINI_API_KEY
 )
 
 # IMPORTANT:
-# Put the SAME model name that worked in test_gemini.py here.
+# Put the SAME model name that worked in test_gemini.py
 GEMINI_MODEL = "gemini-3.6-flash"
 
 
-# =========================================================
-# SEND REPLY TO LINE
-# =========================================================
+# =========================
+# Send reply to LINE
+# =========================
 
 def send_reply(reply_token, text):
 
@@ -93,9 +88,9 @@ def send_reply(reply_token, text):
         )
 
 
-# =========================================================
-# WEBHOOK
-# =========================================================
+# =========================
+# LINE Webhook
+# =========================
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -107,40 +102,43 @@ def callback():
 
     body = request.get_data(as_text=True)
 
-    print("\n========== LINE EVENT ==========")
+    print("========== LINE EVENT ==========")
     print(body)
-    print("================================\n")
+    print("================================")
 
     try:
         handler.handle(body, signature)
 
     except InvalidSignatureError:
-        print("INVALID SIGNATURE")
+        print("Invalid LINE signature")
         return "Invalid signature", 400
 
     except Exception as error:
-        print("WEBHOOK ERROR:", repr(error))
+        print("Webhook error:", repr(error))
         return "Internal Server Error", 500
 
     return "OK", 200
 
 
-# =========================================================
-# TEXT MESSAGE
-# =========================================================
+# =========================
+# Receive text messages
+# =========================
 
-@handler.add(MessageEvent, message=TextMessageContent)
-def handle_text_message(event):
+@handler.add(
+    MessageEvent,
+    message=TextMessageContent
+)
+def handle_message(event):
 
-    text = event.message.text.strip()
+    user_message = event.message.text.strip()
 
-    print("TEXT MESSAGE:", text)
+    print("USER MESSAGE:", user_message)
 
-    # -----------------------------------------------------
-    # CHAT
-    # -----------------------------------------------------
+    # -------------------------
+    # Rich Menu: Chat
+    # -------------------------
 
-    if text == "/chat":
+    if user_message == "/chat":
 
         reply = (
             "🤖 Chat\n\n"
@@ -151,41 +149,41 @@ def handle_text_message(event):
         send_reply(event.reply_token, reply)
         return
 
-    # -----------------------------------------------------
-    # HELP
-    # -----------------------------------------------------
+    # -------------------------
+    # Rich Menu: Help
+    # -------------------------
 
-    if text == "/help":
+    if user_message == "/help":
 
         reply = (
             "📚 Help\n\n"
-            "พิมพ์ข้อความเพื่อคุยกับ AI ได้เลย\n"
+            "พิมพ์คำถามเพื่อคุยกับ AI ได้เลย\n"
             "หรือใช้ Rich Menu ด้านล่าง"
         )
 
         send_reply(event.reply_token, reply)
         return
 
-    # -----------------------------------------------------
-    # ABOUT
-    # -----------------------------------------------------
+    # -------------------------
+    # Rich Menu: About
+    # -------------------------
 
-    if text == "/about":
+    if user_message == "/about":
 
         reply = (
             "ℹ️ About\n\n"
-            "LINE AI Chatbot\n"
-            "Built with Python + LINE Messaging API + Gemini"
+            "LINE AI Chatbot\n\n"
+            "สร้างด้วย Python + LINE Messaging API + Gemini"
         )
 
         send_reply(event.reply_token, reply)
         return
 
-    # -----------------------------------------------------
-    # RESET
-    # -----------------------------------------------------
+    # -------------------------
+    # Rich Menu: Reset
+    # -------------------------
 
-    if text == "/reset":
+    if user_message == "/reset":
 
         reply = (
             "🔄 Reset\n\n"
@@ -195,11 +193,11 @@ def handle_text_message(event):
         send_reply(event.reply_token, reply)
         return
 
-    # -----------------------------------------------------
-    # CONTACT
-    # -----------------------------------------------------
+    # -------------------------
+    # Rich Menu: Contact
+    # -------------------------
 
-    if text == "/contact":
+    if user_message == "/contact":
 
         reply = (
             "📞 Contact\n\n"
@@ -209,104 +207,40 @@ def handle_text_message(event):
         send_reply(event.reply_token, reply)
         return
 
-    # =====================================================
-    # NORMAL GEMINI CHAT
-    # =====================================================
+    # =========================
+    # Normal Gemini Chat
+    # =========================
 
     try:
 
         response = gemini.models.generate_content(
             model=GEMINI_MODEL,
-            contents=text
+            contents=user_message
         )
 
-        answer = response.text
+        ai_reply = response.text
 
-        if not answer:
-            answer = "ขอโทษครับ ตอนนี้ผมยังตอบไม่ได้"
+        if not ai_reply:
+            ai_reply = "ขอโทษครับ ตอนนี้ยังตอบไม่ได้"
 
     except Exception as error:
 
-        print("GEMINI ERROR:", repr(error))
+        print("Gemini error:", repr(error))
 
-        answer = (
+        ai_reply = (
             "ขอโทษครับ 😭\n"
-            "AI มีปัญหาชั่วคราว ลองใหม่อีกครั้งนะครับ"
+            "ตอนนี้ AI มีปัญหาชั่วคราว ลองใหม่อีกครั้งครับ"
         )
 
     send_reply(
         event.reply_token,
-        answer
+        ai_reply
     )
 
 
-# =========================================================
-# POSTBACK FROM RICH MENU
-# =========================================================
-
-@handler.add(PostbackEvent)
-def handle_postback(event):
-
-    data = event.postback.data.strip()
-
-    print("POSTBACK DATA:", data)
-
-    # -----------------------------------------------------
-    # CHAT
-    # -----------------------------------------------------
-
-    if data == "chat":
-
-        reply = (
-            "🤖 Chat\n\n"
-            "พร้อมคุยแล้วครับ!\n"
-            "พิมพ์คำถามมาได้เลย"
-        )
-        
-    elif data == "help":
-
-        reply = (
-            "📚 Help\n\n"
-            "พิมพ์ข้อความเพื่อคุยกับ AI ได้เลย\n"
-            "หรือเลือกเมนูด้านล่าง"
-        )
-
-    elif data == "about":
-
-        reply = (
-            "ℹ️ About\n\n"
-            "LINE AI Chatbot\n"
-            "Built with Python + LINE Messaging API + Gemini"
-        )
-
-
-    elif data == "reset":
-
-        reply = (
-            "🔄 Reset\n\n"
-            "เริ่มต้นใหม่แล้วครับ"
-        )
-
-    elif data == "contact":
-
-        reply = (
-            "📞 Contact\n\n"
-            "ติดต่อผู้ดูแล Bot ได้ที่นี่"
-        )
-
-
-    else:
-
-        reply = (
-            "ไม่พบคำสั่งนี้ครับ\n"
-            f"Data: {data}"
-        )
-
-    send_reply(
-        event.reply_token,
-        reply
-    )
-
+# =========================
+# Home page
+# =========================
 
 @app.route("/", methods=["GET"])
 def home():
@@ -317,10 +251,7 @@ def home():
 if __name__ == "__main__":
 
     port = int(
-        os.getenv(
-            "PORT",
-            "5000"
-        )
+        os.getenv("PORT", "5000")
     )
 
     app.run(
